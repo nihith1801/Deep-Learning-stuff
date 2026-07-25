@@ -84,7 +84,7 @@ class ImageProcessor:
 
 if __name__=="__main__":
     image_processor=ImageProcessor(image_size=(64,64))
-    train_dir="CNN/archive/MRI/Training"
+    train_dir="Deep-Learning-stuff/CNN/archive/MRI/Training"
     X_train, y_train, class_map=image_processor.load_directory(train_dir)
     print(f"\nTotal train images: {X_train.shape[0]}")
     print(f"\nImage Shape: {X_train.shape[1:]}")
