@@ -61,7 +61,7 @@ def _to_engine(arr):
 
     return arr
 
-def __to_numpy(arr):
+def _to_numpy(arr):
     if isinstance(arr,Tensor): return arr.numpy()
     if BACKEND=="mlx" and "mlx" in str(type(arr)):
         return np.array(arr) 
@@ -300,9 +300,9 @@ class Dense(BaseLayer):
         '''Computing l1+l2 penalty for loss'''
         regularization=0.0
         if self.l1>0:
-            regularization=regularization+self.l1*float(__to_numpy(_sum(_abs(self.Weights)))) #Lasso taking absolute
+            regularization=regularization+self.l1*float(_to_numpy(_sum(_abs(self.Weights)))) #Lasso taking absolute
         if self.l2>0:
-            regularization=regularization+self.l2*float(__to_numpy(_sum(self.Weights**2))) #Ridge taking squared
+            regularization=regularization+self.l2*float(_to_numpy(_sum(self.Weights**2))) #Ridge taking squared
         return regularization
 
     def params(self):
@@ -411,7 +411,7 @@ class MSELoss:
         self.labels=_to_engine(labels)
         difference=self.predictions-self.labels
         '''Now implmenting cost function'''
-        return float(__to_numpy(_sum(difference**2)/self.predictions.shape[0]))
+        return float(_to_numpy(_sum(difference**2)/self.predictions.shape[0]))
 
     def backward_pass(self):
         return Tensor(2*(self.predictions-self.labels)/self.predictions.shape[0])
@@ -474,5 +474,37 @@ class Model:
         for epoch in range(epochs):
             idx=np.random.permutation(n) #Taking random indices for training
             X_s,y_s = X[idx], y[idx]
-            
-            
+
+            epoch_data_loss=0
+            epoch_regularization_loss=0
+            correct=0
+            for b in range(batches):
+                start=b*batch_size
+                end=min(start+batch_size,n)
+                Xb, yb = X_s[start:end],y_s[start:end]
+                predicitons=self._forward_pass(Xb)
+                data_loss=self.loss_function.forward_pass(predicitons.data,yb)
+                reg_loss=self._compute_reg_loss()
+                total_loss=data_loss+reg_loss #How much loss is there
+                '''Updating values in the log dict'''
+                epoch_data_loss+=data_loss
+                epoch_regularization_loss+=reg_loss
+
+                predicited_classes=np.argmax(_to_numpy(predicitons.data),axis=1)
+                correct+=np.sum(predicited_classes==yb)
+
+                gradient= self.loss_function.backward_pass()
+                self._backward_pass(gradient)
+
+            average_data_loss=epoch_data_loss/batches
+            average_regularization_loss=epoch_regularization_loss/batches
+            average_total_loss=average_data_loss+average_regularization_loss
+            accuracy=correct/n
+
+            self.history['loss'].append(average_total_loss)
+            self.history['accuracy'].append(accuracy)
+            self.history['regularization_loss'].append(average_regularization_loss)
+
+            if verbose:
+                message= f"Epoch: {epoch+1}/{epochs}  loss: {average_total_loss:.4f} ,data:{average_data_loss:.4f}, reg: {average_regularization_loss:.6f})"
+
